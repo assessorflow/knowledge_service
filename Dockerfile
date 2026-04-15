@@ -4,13 +4,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 
 WORKDIR /app
 
-COPY knowledge-service/pyproject.toml .
-COPY knowledge-service/src/ src/
+COPY pyproject.toml .
+COPY src/ src/
+COPY proto/ proto/
 
-# Copy gRPC stubs from grpc-registry
-COPY grpc-registry/gen/python/ grpc-stubs/
-
+# Install dependencies
 RUN pip install --no-cache-dir .
+
+# Generate gRPC stubs from local proto files
+RUN python -m grpc_tools.protoc \
+    -Iproto \
+    --python_out=grpc-stubs \
+    --grpc_python_out=grpc-stubs \
+    assessorflow/knowledge/v1/knowledge.proto \
+    && find grpc-stubs -type d -exec touch {}/__init__.py \;
 
 ENV PYTHONPATH=/app/src:/app/grpc-stubs
 EXPOSE 8030 9030

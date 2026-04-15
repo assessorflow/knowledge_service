@@ -10,8 +10,14 @@ src/knowledge_service.egg-info/top_level.txt
 src/knowledge_service/db/__init__.py
 src/knowledge_service/db/pool.py
 src/knowledge_service/db/repository.py
+src/knowledge_service/grpc/__init__.py
+src/knowledge_service/grpc/interceptor.py
+src/knowledge_service/grpc/server.py
 src/knowledge_service/routes/__init__.py
 src/knowledge_service/routes/internal.py
 src/knowledge_service/services/__init__.py
+src/knowledge_service/services/auth.py
 src/knowledge_service/services/chunking.py
 src/knowledge_service/services/embedding.py
+src/knowledge_service/services/material_processor.py
+tests/test_grpc.py

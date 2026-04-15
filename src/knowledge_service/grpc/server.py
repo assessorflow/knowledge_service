@@ -17,6 +17,7 @@ from knowledge_service import config
 from assessorflow.knowledge.v1 import knowledge_pb2, knowledge_pb2_grpc
 from knowledge_service.db import repository as repo
 from knowledge_service.services import chunking, embedding
+from knowledge_service.grpc.interceptor import LoggingInterceptor
 
 logger = structlog.get_logger(__name__)
 
@@ -214,7 +215,7 @@ def _dict_to_chunk_proto(d: dict) -> knowledge_pb2.Chunk:
 
 async def start_grpc_server() -> grpc.aio.Server:
     """Start the async gRPC server on GRPC_PORT."""
-    server = grpc.aio.server()
+    server = grpc.aio.server(interceptors=[LoggingInterceptor()])
     knowledge_pb2_grpc.add_KnowledgeServiceServicer_to_server(
         KnowledgeServiceServicer(), server
     )
@@ -226,5 +227,5 @@ async def start_grpc_server() -> grpc.aio.Server:
 
 async def stop_grpc_server(server: grpc.aio.Server) -> None:
     """Gracefully stop the gRPC server."""
-    await server.stop(grace=5)
+    await server.stop(grace=30)
     logger.info("grpc_server_stopped")

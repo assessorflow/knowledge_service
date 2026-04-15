@@ -342,6 +342,11 @@ def _jsonb(data: dict | None) -> str | None:
     return json.dumps(data)
 
 
+def _to_uuid(value: str | None):
+    """Convert string to UUID, or None if empty."""
+    return UUID(value) if value else None
+
+
 def _row_to_chunk(row: asyncpg.Record, score: bool = False) -> dict[str, Any]:
     result: dict[str, Any] = {
         "chunk_id": str(row["id"]),

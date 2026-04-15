@@ -9,14 +9,18 @@ Owns af_knowledge database (topics, document_chunks, policy_chunks, enriched_chu
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import structlog
 
 from knowledge_service import config
 from knowledge_service.db.pool import get_pool, close_pool
 from knowledge_service.routes.internal import router as internal_router
 from knowledge_service.grpc.server import start_grpc_server, stop_grpc_server, GRPC_PORT
+from prometheus_fastapi_instrumentator import Instrumentator
 
 structlog.configure(
     processors=[
@@ -54,6 +58,43 @@ app = FastAPI(
 
 app.include_router(internal_router)
 
+# Prometheus metrics at /metrics
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+
+# ---------------------------------------------------------------------------
+# Structured error handlers (M-1)
+# ---------------------------------------------------------------------------
+
+def _error_response(status: int, error: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status,
+        content={
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": status,
+            "error": error,
+            "message": message,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    errors = "; ".join(
+        f"{'.'.join(str(l) for l in e['loc'])}: {e['msg']}" for e in exc.errors()
+    )
+    return _error_response(400, "Bad Request", errors)
+
+
+@app.exception_handler(Exception)
+async def generic_error_handler(request: Request, exc: Exception):
+    logger.error("unhandled_exception", error=str(exc), path=request.url.path)
+    return _error_response(500, "Internal Server Error", "An unexpected error occurred")
+
+
+# ---------------------------------------------------------------------------
+# Health / Readiness
+# ---------------------------------------------------------------------------
 
 @app.get("/health")
 async def health():
@@ -67,15 +108,16 @@ async def ready():
         await pool.fetchval("SELECT 1")
         return {"status": "ready", "database": "connected", "grpc_port": GRPC_PORT}
     except Exception as exc:
-        return {"status": "not_ready", "error": str(exc)}
+        return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(exc)})
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
 
     uvicorn.run(
         "knowledge_service.main:app",
         host="0.0.0.0",
         port=config.SERVICE_PORT,
-        reload=True,
+        reload=os.environ.get("ENV", "prod") == "dev",
     )

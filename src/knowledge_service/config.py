@@ -32,5 +32,10 @@ DEFAULT_TOP_K = int(os.environ.get("DEFAULT_TOP_K", "5"))
 # Embedding
 EMBEDDING_DIMENSION = 1536
 
+# Identity Service (for JWT validation)
+IDENTITY_JWKS_URL = os.environ.get("IDENTITY_JWKS_URL", "http://localhost:8081/.well-known/jwks.json")
+JWT_ISSUER = os.environ.get("JWT_ISSUER", "assessorflow")
+JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "assessorflow-api")
+
 # Server
 SERVICE_PORT = int(os.environ.get("KS_PORT", "8030"))

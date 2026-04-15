@@ -19,7 +19,7 @@ The main gaps are: **OpenAI API key exposed in .env (not gitignored!)**, **zero-
 
 ## CRITICAL — Must Fix Before Any Deployment
 
-### C-1. OpenAI API Key Exposed — `.env` NOT Gitignored
+### ~~C-1. OpenAI API Key Exposed — `.env` NOT Gitignored~~ FIXED
 
 **Files:** `.env` (contains `sk-proj-dCNwu5...`), `.gitignore` (only lists `grpc-stubs/`)
 
@@ -38,7 +38,7 @@ The `.gitignore` does NOT include `.env`, `*.pyc`, `__pycache__/`, or any creden
 
 ---
 
-### C-2. Zero-Vector Fallback Silently Corrupts Vector Store
+### ~~C-2. Zero-Vector Fallback Silently Corrupts Vector Store~~ FIXED
 
 **File:** `services/embedding.py:45, 68, 88`
 
@@ -61,7 +61,7 @@ The caller (`ProcessMaterial`) should catch this and return an error to the Vali
 
 ---
 
-### C-3. No Transactions on ProcessMaterial
+### ~~C-3. No Transactions on ProcessMaterial~~ FIXED
 
 **File:** `routes/internal.py` — ProcessMaterial endpoint
 
@@ -82,7 +82,7 @@ async with pool.acquire() as conn:
 
 ---
 
-### C-4. Dockerfile References `grpc-registry`
+### ~~C-4. Dockerfile References `grpc-registry`~~ FIXED
 
 **File:** `Dockerfile:11`
 
@@ -98,7 +98,7 @@ Same issue as other services. Depends on the centralized grpc-registry.
 
 ## HIGH — Should Fix Before Production
 
-### H-1. No Auth on REST or gRPC Endpoints
+### ~~H-1. No Auth on REST or gRPC Endpoints~~ FIXED
 
 Same pattern as submission service. All 8 REST endpoints and 7 gRPC RPCs are unauthenticated.
 
@@ -106,7 +106,7 @@ Same pattern as submission service. All 8 REST endpoints and 7 gRPC RPCs are una
 
 ---
 
-### H-2. `reload=True` in Production Entry Point
+### ~~H-2. `reload=True` in Production Entry Point~~ FIXED
 
 **File:** `main.py:80`
 
@@ -114,7 +114,7 @@ Same pattern as submission service. All 8 REST endpoints and 7 gRPC RPCs are una
 
 ---
 
-### H-3. `ready` Endpoint Returns 200 on Failure
+### ~~H-3. `ready` Endpoint Returns 200 on Failure~~ FIXED
 
 **File:** `main.py:70`
 
@@ -122,7 +122,7 @@ Same pattern as submission service. All 8 REST endpoints and 7 gRPC RPCs are una
 
 ---
 
-### H-4. No Graceful gRPC Shutdown
+### ~~H-4. No Graceful gRPC Shutdown~~ FIXED
 
 **File:** `grpc/server.py`
 
@@ -130,7 +130,7 @@ Same pattern as submission service. All 8 REST endpoints and 7 gRPC RPCs are una
 
 ---
 
-### H-5. Inconsistent Logic Between REST and gRPC
+### ~~H-5. Inconsistent Logic Between REST and gRPC~~ FIXED
 
 **File:** `routes/internal.py` vs `grpc/server.py`
 
@@ -140,7 +140,7 @@ REST ProcessMaterial sanitizes null bytes (`content_text.replace("\x00", "")`), 
 
 ---
 
-### H-6. No Metrics or Observability
+### ~~H-6. No Metrics or Observability~~ FIXED
 
 No Prometheus metrics. Can't answer: "How many chunks were created today?" or "What's the embedding API p99 latency?"
 
@@ -150,7 +150,7 @@ No Prometheus metrics. Can't answer: "How many chunks were created today?" or "W
 
 ## MEDIUM — Code Quality & Maintainability
 
-### M-1. No Structured Error Responses
+### ~~M-1. No Structured Error Responses~~ FIXED
 
 REST errors use raw `HTTPException`. No consistent error format.
 
@@ -158,7 +158,7 @@ REST errors use raw `HTTPException`. No consistent error format.
 
 ---
 
-### M-2. `SIMILARITY_THRESHOLD` Defined But Never Used
+### ~~M-2. `SIMILARITY_THRESHOLD` Defined But Never Used~~ DEFERRED
 
 **File:** `config.py:29`
 
@@ -171,7 +171,7 @@ WHERE 1 - (embedding <=> $1::vector) >= $threshold
 
 ---
 
-### M-3. No Pagination on `get_chunks_by_workflow()`
+### ~~M-3. No Pagination on `get_chunks_by_workflow()`~~ DEFERRED
 
 Returns ALL chunks for a workflow. Could be thousands.
 
@@ -179,7 +179,7 @@ Returns ALL chunks for a workflow. Could be thousands.
 
 ---
 
-### M-4. Token Count Estimation is Crude
+### ~~M-4. Token Count Estimation is Crude~~ ACCEPTED
 
 **File:** `repository.py` — `len(text) // 4`
 
@@ -189,7 +189,7 @@ Not accurate. Different models use different tokenizers.
 
 ---
 
-### M-5. `assessor_id` Nullable in `document_chunks`
+### ~~M-5. `assessor_id` Nullable in `document_chunks`~~ DEFERRED
 
 Per `vector_schema.md` §1, `assessor_id` should be `NOT NULL`. Code allows null:
 ```python
@@ -200,7 +200,7 @@ UUID(assessor_id) if assessor_id else None
 
 ---
 
-### M-6. Deduplication Strategy is Inconsistent
+### ~~M-6. Deduplication Strategy is Inconsistent~~ DEFERRED
 
 Both `content_hash` (per-chunk) and `file_hash` (per-file) exist, but only `content_hash` is checked for deduplication. Two files with the same content but different names will create duplicate chunks.
 
@@ -210,16 +210,16 @@ Both `content_hash` (per-chunk) and `file_hash` (per-file) exist, but only `cont
 
 ## LOW — Nice to Have
 
-### L-1. No Embedding Version Tracking
+### ~~L-1. No Embedding Version Tracking~~ DEFERRED
 Per `vector_schema.md`, embedding model version should be tracked. Not implemented.
 
-### L-2. No Semantic Cache
+### ~~L-2. No Semantic Cache~~ DEFERRED
 `vector_schema.md` mentions a semantic cache for repeated queries. Not implemented.
 
-### L-3. No KB Re-Ranking Across Tables
+### ~~L-3. No KB Re-Ranking Across Tables~~ DEFERRED
 Each KB is searched separately. No cross-KB merge and re-rank as described in `vector_schema.md` RAG Query Flow.
 
-### L-4. Tests Only Cover Integration
+### ~~L-4. Tests Only Cover Integration~~ DEFERRED
 No unit tests for chunking, embedding, or repository functions.
 
 ---

@@ -7,12 +7,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import structlog
 
 from knowledge_service.db import repository as repo
 from knowledge_service.services import chunking, embedding
+from knowledge_service.services.material_processor import process_material as _process_material
+from knowledge_service.services.embedding import EmbeddingError
+from knowledge_service.services.auth import UserContext, get_current_user
 
 logger = structlog.get_logger(__name__)
 
@@ -98,111 +101,30 @@ async def process_material(req: ProcessMaterialRequest):
     """Receive extracted text, chunk it, embed it, store in the appropriate table.
 
     Routes based on source_type:
-    - "direct_text" / "ocr_extracted" → document_chunks
-    - "rubric"                        → policy_chunks (requires assessment_id)
-    - "web_research"                  → enriched_chunks
-    """
-    logger.info(
-        "process_material",
-        workflow_id=req.workflow_id,
-        source_type=req.source_type,
-        content_length=len(req.content_text),
-    )
+    - "direct_text" / "ocr_extracted" -> document_chunks
+    - "rubric"                        -> policy_chunks (requires assessment_id)
+    - "web_research"                  -> enriched_chunks
 
-    # Validate rubric requires assessment_id
+    Uses shared material_processor (C-3 transactional, C-2 fail-fast on embedding, H-5 shared logic).
+    """
     if req.source_type == "rubric" and not req.assessment_id:
         raise HTTPException(400, "assessment_id is required when source_type is 'rubric'")
 
-    # Sanitize text — remove null bytes that break PostgreSQL UTF-8 encoding
-    clean_text = req.content_text.replace("\x00", "")
-
-    # Chunk the text
-    chunks = chunking.split_text_into_chunks(clean_text)
-    if not chunks:
-        return ProcessMaterialResponse(chunks_created=0, status="success")
-
-    # Sanitize each chunk too
-    chunks = [c.replace("\x00", "") for c in chunks]
-
-    # Compute file hash for dedup
-    file_hash = chunking.compute_file_hash(clean_text)
-
-    # Embed chunks in batches (OpenAI has per-request limits)
-    EMBED_BATCH_SIZE = 20
-    embeddings: list[list[float]] = []
-    for batch_start in range(0, len(chunks), EMBED_BATCH_SIZE):
-        batch = chunks[batch_start:batch_start + EMBED_BATCH_SIZE]
-        batch_embeddings = await embedding.embed_texts(batch)
-        embeddings.extend(batch_embeddings)
-
-    # Estimate token count (~4 chars per token)
-    def _estimate_tokens(text: str) -> int:
-        return len(text) // 4
-
-    # Route to correct table based on source_type
-    created = 0
-    for i, (chunk_text, emb) in enumerate(zip(chunks, embeddings)):
-        content_hash = chunking.compute_content_hash(chunk_text)
-
-        if req.source_type in ("direct_text", "ocr_extracted"):
-            # Document KB
-            if await repo.check_duplicate_chunk(req.workflow_id, content_hash):
-                logger.debug("chunk_dedup_skip", workflow_id=req.workflow_id, index=i)
-                continue
-            await repo.insert_document_chunk(
-                workflow_id=req.workflow_id,
-                content=chunk_text,
-                embedding=emb,
-                chunk_index=i,
-                source_type=req.source_type,
-                file_hash=file_hash,
-                content_hash=content_hash,
-                assessor_id=req.assessor_id,
-                token_count=_estimate_tokens(chunk_text),
-                metadata={"source_file": req.source_file} if req.source_file else None,
-            )
-
-        elif req.source_type == "rubric":
-            # Policy KB — per-assessment rubric
-            await repo.insert_policy_chunk(
-                content=chunk_text,
-                embedding=emb,
-                policy_type="rubric",
-                assessment_id=req.assessment_id,
-                workflow_id=req.workflow_id,
-                chunk_index=i,
-                source="assessor_rubric",
-                assessor_id=req.assessor_id,
-                metadata={"source_file": req.source_file} if req.source_file else None,
-            )
-
-        elif req.source_type == "web_research":
-            # Enriched KB
-            await repo.insert_enriched_chunk(
-                workflow_id=req.workflow_id,
-                content=chunk_text,
-                embedding=emb,
-                source_url=req.source_url,
-                source_type="web_text",
-                chunk_index=i,
-                assessor_id=req.assessor_id,
-                metadata={"source_file": req.source_file} if req.source_file else None,
-            )
-
-        else:
-            raise HTTPException(400, f"Unknown source_type: {req.source_type}")
-
-        created += 1
-
-    logger.info(
-        "process_material_done",
-        workflow_id=req.workflow_id,
-        total_chunks=len(chunks),
-        created=created,
-        deduped=len(chunks) - created,
-    )
-
-    return ProcessMaterialResponse(chunks_created=created, status="success")
+    try:
+        result = await _process_material(
+            workflow_id=req.workflow_id,
+            content_text=req.content_text,
+            source_type=req.source_type,
+            source_file=req.source_file,
+            source_url=req.source_url,
+            assessor_id=req.assessor_id,
+            assessment_id=req.assessment_id,
+        )
+        return ProcessMaterialResponse(**result)
+    except EmbeddingError as e:
+        raise HTTPException(502, f"Embedding failed: {e}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -331,7 +253,7 @@ async def chunks_by_ids(req: ChunksByIdsRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/admin/policies")
-async def admin_add_policy(req: AdminPolicyRequest):
+async def admin_add_policy(req: AdminPolicyRequest, user: UserContext = Depends(get_current_user)):
     """Upload policy document — system-wide or per-assessment."""
     chunks = chunking.split_text_into_chunks(req.content)
     if not chunks:
