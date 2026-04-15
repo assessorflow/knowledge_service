@@ -1,0 +1,17 @@
+pyproject.toml
+src/knowledge_service/__init__.py
+src/knowledge_service/config.py
+src/knowledge_service/main.py
+src/knowledge_service.egg-info/PKG-INFO
+src/knowledge_service.egg-info/SOURCES.txt
+src/knowledge_service.egg-info/dependency_links.txt
+src/knowledge_service.egg-info/requires.txt
+src/knowledge_service.egg-info/top_level.txt
+src/knowledge_service/db/__init__.py
+src/knowledge_service/db/pool.py
+src/knowledge_service/db/repository.py
+src/knowledge_service/routes/__init__.py
+src/knowledge_service/routes/internal.py
+src/knowledge_service/services/__init__.py
+src/knowledge_service/services/chunking.py
+src/knowledge_service/services/embedding.py
