@@ -15,6 +15,7 @@ CREATE TABLE topics (
     workflow_id VARCHAR(50) NOT NULL,
     parent_id UUID REFERENCES topics(id),
     name VARCHAR(255) NOT NULL,
+    assessor_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

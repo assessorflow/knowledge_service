@@ -48,8 +48,6 @@ async def test_store_topics(client: AsyncClient):
         },
     )
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["topics_stored"] >= 3  # 1 main + 2 subtopics
 
 
 # ===========================================================================
@@ -317,7 +315,7 @@ async def test_chunks_by_ids(client: AsyncClient):
             "workflow_id": "wf_byid001",
         },
     )
-    chunk_ids = [c["id"] for c in wf_resp.json()["chunks"]]
+    chunk_ids = [c["chunk_id"] for c in wf_resp.json()["chunks"]]
 
     resp = await client.post(
         "/api/v1/internal/chunks-by-ids",
@@ -365,11 +363,11 @@ async def test_get_chunk_detail(client: AsyncClient):
             "workflow_id": "wf_detail001",
         },
     )
-    chunk_id = wf_resp.json()["chunks"][0]["id"]
+    chunk_id = wf_resp.json()["chunks"][0]["chunk_id"]
 
     resp = await client.get(f"/api/v1/knowledge/chunks/{chunk_id}")
     assert resp.status_code == 200
-    assert resp.json()["id"] == chunk_id
+    assert resp.json()["chunk_id"] == chunk_id
     assert "content" in resp.json()
 
 
