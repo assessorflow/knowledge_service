@@ -20,6 +20,7 @@ logger = structlog.get_logger(__name__)
 
 class EmbeddingError(Exception):
     """Raised when embedding generation fails. Caller should NOT store chunks."""
+
     pass
 
 
@@ -71,7 +72,9 @@ async def _embed_openai(texts: list[str]) -> list[list[float]]:
             )
             return embeddings
     except httpx.HTTPStatusError as exc:
-        raise EmbeddingError(f"OpenAI API error {exc.response.status_code}: {exc.response.text}")
+        raise EmbeddingError(
+            f"OpenAI API error {exc.response.status_code}: {exc.response.text}"
+        )
     except Exception as exc:
         raise EmbeddingError(f"OpenAI embedding failed: {exc}")
 
@@ -91,7 +94,9 @@ async def _embed_model_broker(texts: list[str]) -> list[list[float]]:
             logger.info("model_broker_embedding_success", count=len(embeddings))
             return embeddings
     except httpx.HTTPStatusError as exc:
-        raise EmbeddingError(f"Model Broker API error {exc.response.status_code}: {exc.response.text}")
+        raise EmbeddingError(
+            f"Model Broker API error {exc.response.status_code}: {exc.response.text}"
+        )
     except EmbeddingError:
         raise
     except Exception as exc:

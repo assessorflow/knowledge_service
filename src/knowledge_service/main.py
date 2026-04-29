@@ -38,10 +38,14 @@ _grpc_server = None
 async def lifespan(app: FastAPI):
     global _grpc_server
     # Startup
-    logger.info("knowledge_service_starting", rest_port=config.SERVICE_PORT, grpc_port=GRPC_PORT)
+    logger.info(
+        "knowledge_service_starting", rest_port=config.SERVICE_PORT, grpc_port=GRPC_PORT
+    )
     await get_pool()
     _grpc_server = await start_grpc_server()
-    logger.info("knowledge_service_ready", rest_port=config.SERVICE_PORT, grpc_port=GRPC_PORT)
+    logger.info(
+        "knowledge_service_ready", rest_port=config.SERVICE_PORT, grpc_port=GRPC_PORT
+    )
     yield
     # Shutdown
     if _grpc_server:
@@ -66,6 +70,7 @@ Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 # Structured error handlers (M-1)
 # ---------------------------------------------------------------------------
 
+
 def _error_response(status: int, error: str, message: str) -> JSONResponse:
     return JSONResponse(
         status_code=status,
@@ -81,7 +86,7 @@ def _error_response(status: int, error: str, message: str) -> JSONResponse:
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
     errors = "; ".join(
-        f"{'.'.join(str(l) for l in e['loc'])}: {e['msg']}" for e in exc.errors()
+        f"{'.'.join(str(part) for part in e['loc'])}: {e['msg']}" for e in exc.errors()
     )
     return _error_response(400, "Bad Request", errors)
 
@@ -96,6 +101,7 @@ async def generic_error_handler(request: Request, exc: Exception):
 # Health / Readiness
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "knowledge-service", "grpc_port": GRPC_PORT}
@@ -108,7 +114,9 @@ async def ready():
         await pool.fetchval("SELECT 1")
         return {"status": "ready", "database": "connected", "grpc_port": GRPC_PORT}
     except Exception as exc:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(exc)})
+        return JSONResponse(
+            status_code=503, content={"status": "not_ready", "error": str(exc)}
+        )
 
 
 if __name__ == "__main__":

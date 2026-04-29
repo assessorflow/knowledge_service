@@ -14,17 +14,17 @@ from knowledge_service import config
 
 # Separators ordered by strength — strongest boundaries split first
 _SEPARATORS = [
-    "\n## ",      # Markdown H2 headers
-    "\n### ",     # Markdown H3 headers
-    "\n#### ",    # Markdown H4 headers
-    "\n\n",       # Paragraph boundaries
-    "\n",         # Line breaks
-    ". ",         # Sentence boundaries
+    "\n## ",  # Markdown H2 headers
+    "\n### ",  # Markdown H3 headers
+    "\n#### ",  # Markdown H4 headers
+    "\n\n",  # Paragraph boundaries
+    "\n",  # Line breaks
+    ". ",  # Sentence boundaries
     "? ",
     "! ",
     "; ",
     ", ",
-    " ",          # Word boundaries (last resort)
+    " ",  # Word boundaries (last resort)
 ]
 
 _splitter = RecursiveCharacterTextSplitter(
@@ -67,6 +67,7 @@ def split_text_into_chunks(
 def compute_content_hash(content: str) -> str:
     """SHA-256 hash of normalized chunk content for deduplication."""
     import re
+
     normalized = re.sub(r"\s+", " ", content).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 

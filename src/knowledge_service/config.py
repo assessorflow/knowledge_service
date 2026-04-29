@@ -15,7 +15,9 @@ EMBEDDING_PROVIDER = os.environ.get("EMBEDDING_PROVIDER", "openai")
 
 # OpenAI (used when EMBEDDING_PROVIDER=openai)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+OPENAI_EMBEDDING_MODEL = os.environ.get(
+    "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
+)
 
 # Model Broker (used when EMBEDDING_PROVIDER=model_broker)
 MODEL_BROKER_URL = os.environ.get("MODEL_BROKER_URL", "http://localhost:8050")
@@ -33,7 +35,9 @@ DEFAULT_TOP_K = int(os.environ.get("DEFAULT_TOP_K", "5"))
 EMBEDDING_DIMENSION = 1536
 
 # Identity Service (for JWT validation)
-IDENTITY_JWKS_URL = os.environ.get("IDENTITY_JWKS_URL", "http://localhost:8081/.well-known/jwks.json")
+IDENTITY_JWKS_URL = os.environ.get(
+    "IDENTITY_JWKS_URL", "http://localhost:8081/.well-known/jwks.json"
+)
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "assessorflow")
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "assessorflow-api")
 

@@ -8,11 +8,12 @@ COPY pyproject.toml .
 COPY src/ src/
 COPY proto/ proto/
 
-# Install dependencies
-RUN pip install --no-cache-dir .
+# Upgrade pip + install dependencies
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
 
 # Generate gRPC stubs from local proto files
-RUN python -m grpc_tools.protoc \
+RUN mkdir -p grpc-stubs \
+    && python -m grpc_tools.protoc \
     -Iproto \
     --python_out=grpc-stubs \
     --grpc_python_out=grpc-stubs \

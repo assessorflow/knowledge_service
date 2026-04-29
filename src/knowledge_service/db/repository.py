@@ -23,6 +23,7 @@ logger = structlog.get_logger(__name__)
 # document_chunks
 # ---------------------------------------------------------------------------
 
+
 async def insert_document_chunk(
     workflow_id: str,
     content: str,
@@ -63,9 +64,7 @@ async def insert_document_chunk(
     return str(row["id"])
 
 
-async def check_duplicate_chunk(
-    workflow_id: str, content_hash: str
-) -> bool:
+async def check_duplicate_chunk(workflow_id: str, content_hash: str) -> bool:
     pool = await get_pool()
     row = await pool.fetchrow(
         """
@@ -136,6 +135,7 @@ async def similarity_search_documents(
 # ---------------------------------------------------------------------------
 # policy_chunks
 # ---------------------------------------------------------------------------
+
 
 async def insert_policy_chunk(
     content: str,
@@ -217,6 +217,7 @@ async def similarity_search_policies(
 # enriched_chunks
 # ---------------------------------------------------------------------------
 
+
 async def insert_enriched_chunk(
     workflow_id: str,
     content: str,
@@ -276,6 +277,7 @@ async def similarity_search_enriched(
 # topics
 # ---------------------------------------------------------------------------
 
+
 async def insert_topic(
     workflow_id: str,
     name: str,
@@ -322,6 +324,7 @@ async def get_topics_by_workflow(workflow_id: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _vec_literal(vec: list[float]) -> str:
     """Convert a Python list to pgvector literal string."""
