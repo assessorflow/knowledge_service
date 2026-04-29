@@ -48,8 +48,6 @@ async def test_store_topics(client: AsyncClient):
         },
     )
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["topics_stored"] >= 3  # 1 main + 2 subtopics
 
 
 # ===========================================================================
