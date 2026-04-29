@@ -7,8 +7,6 @@ that the REST endpoints use.
 
 from __future__ import annotations
 
-import asyncio
-from concurrent import futures
 
 import grpc
 import structlog
@@ -31,16 +29,24 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
     # 1. ProcessMaterial
     # ------------------------------------------------------------------
     async def ProcessMaterial(self, request, context):
-        logger.info("grpc_process_material", workflow_id=request.workflow_id, source_type=request.source_type)
+        logger.info(
+            "grpc_process_material",
+            workflow_id=request.workflow_id,
+            source_type=request.source_type,
+        )
 
         if request.source_type == "rubric" and not request.assessment_id:
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            context.set_details("assessment_id is required when source_type is 'rubric'")
+            context.set_details(
+                "assessment_id is required when source_type is 'rubric'"
+            )
             return knowledge_pb2.ProcessMaterialResponse()
 
         chunks = chunking.split_text_into_chunks(request.content_text)
         if not chunks:
-            return knowledge_pb2.ProcessMaterialResponse(chunks_created=0, status="success")
+            return knowledge_pb2.ProcessMaterialResponse(
+                chunks_created=0, status="success"
+            )
 
         file_hash = chunking.compute_file_hash(request.content_text)
         embeddings = await embedding.embed_texts(chunks)
@@ -93,7 +99,9 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
 
             created += 1
 
-        return knowledge_pb2.ProcessMaterialResponse(chunks_created=created, status="success")
+        return knowledge_pb2.ProcessMaterialResponse(
+            chunks_created=created, status="success"
+        )
 
     # ------------------------------------------------------------------
     # 2. StoreTopics
@@ -114,7 +122,9 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
                     parent_id=topic_id,
                 )
 
-        return knowledge_pb2.StoreTopicsResponse(status="stored", workflow_id=request.workflow_id)
+        return knowledge_pb2.StoreTopicsResponse(
+            status="stored", workflow_id=request.workflow_id
+        )
 
     # ------------------------------------------------------------------
     # 3. GetTopics
@@ -150,18 +160,26 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
         top_k = request.top_k or 5
 
         if request.kb_type == "document":
-            results = await repo.similarity_search_documents(query_emb, request.workflow_id, top_k)
+            results = await repo.similarity_search_documents(
+                query_emb, request.workflow_id, top_k
+            )
         elif request.kb_type == "enriched":
-            results = await repo.similarity_search_enriched(query_emb, request.workflow_id, top_k)
+            results = await repo.similarity_search_enriched(
+                query_emb, request.workflow_id, top_k
+            )
         elif request.kb_type == "policy":
-            results = await repo.similarity_search_policies(query_emb, assessment_id=None, top_k=top_k)
+            results = await repo.similarity_search_policies(
+                query_emb, assessment_id=None, top_k=top_k
+            )
         else:
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(f"Unknown kb_type: {request.kb_type}")
             return knowledge_pb2.SimilaritySearchResponse()
 
         chunks = [_dict_to_chunk_proto(c) for c in results]
-        return knowledge_pb2.SimilaritySearchResponse(workflow_id=request.workflow_id, chunks=chunks)
+        return knowledge_pb2.SimilaritySearchResponse(
+            workflow_id=request.workflow_id, chunks=chunks
+        )
 
     # ------------------------------------------------------------------
     # 5. SearchPolicies
@@ -171,7 +189,9 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
         assessment_id = request.assessment_id or None
         top_k = request.top_k or 5
 
-        results = await repo.similarity_search_policies(query_emb, assessment_id=assessment_id, top_k=top_k)
+        results = await repo.similarity_search_policies(
+            query_emb, assessment_id=assessment_id, top_k=top_k
+        )
         chunks = [_dict_to_chunk_proto(c) for c in results]
         return knowledge_pb2.SearchPoliciesResponse(chunks=chunks)
 
@@ -181,7 +201,9 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
     async def GetChunksByWorkflow(self, request, context):
         results = await repo.get_chunks_by_workflow(request.workflow_id)
         chunks = [_dict_to_chunk_proto(c) for c in results]
-        return knowledge_pb2.GetChunksByWorkflowResponse(workflow_id=request.workflow_id, chunks=chunks)
+        return knowledge_pb2.GetChunksByWorkflowResponse(
+            workflow_id=request.workflow_id, chunks=chunks
+        )
 
     # ------------------------------------------------------------------
     # 7. GetChunksByIds
@@ -195,6 +217,7 @@ class KnowledgeServiceServicer(knowledge_pb2_grpc.KnowledgeServiceServicer):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _dict_to_chunk_proto(d: dict) -> knowledge_pb2.Chunk:
     """Convert a repository dict to a protobuf Chunk message."""
@@ -212,6 +235,7 @@ def _dict_to_chunk_proto(d: dict) -> knowledge_pb2.Chunk:
 # ---------------------------------------------------------------------------
 # Server lifecycle
 # ---------------------------------------------------------------------------
+
 
 async def start_grpc_server() -> grpc.aio.Server:
     """Start the async gRPC server on GRPC_PORT."""

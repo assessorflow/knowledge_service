@@ -13,7 +13,9 @@ import structlog
 
 from knowledge_service.db import repository as repo
 from knowledge_service.services import chunking, embedding
-from knowledge_service.services.material_processor import process_material as _process_material
+from knowledge_service.services.material_processor import (
+    process_material as _process_material,
+)
 from knowledge_service.services.embedding import EmbeddingError
 from knowledge_service.services.auth import UserContext, get_current_user
 
@@ -26,14 +28,17 @@ router = APIRouter(prefix="/api/v1")
 # Request / Response models
 # ---------------------------------------------------------------------------
 
+
 class ProcessMaterialRequest(BaseModel):
     workflow_id: str
     content_text: str
-    source_type: str = "direct_text"  # "direct_text" | "ocr_extracted" → document_chunks
-                                       # "rubric" → policy_chunks
-                                       # "web_research" → enriched_chunks
+    source_type: str = (
+        "direct_text"  # "direct_text" | "ocr_extracted" → document_chunks
+    )
+    # "rubric" → policy_chunks
+    # "web_research" → enriched_chunks
     source_file: str = ""
-    source_url: str = ""              # For web research content
+    source_url: str = ""  # For web research content
     assessor_id: str | None = None
     assessment_id: str | None = None  # Required for rubric storage
 
@@ -87,7 +92,9 @@ class AdminPolicyRequest(BaseModel):
     policy_type: str = "rubric"
     assessment_id: str | None = None  # NULL = system-wide, UUID = per-assessment rubric
     workflow_id: str | None = None
-    source: str | None = None  # "system_default" | "assessor_rubric" | "auto_generated" (auto-derived if not set)
+    source: str | None = (
+        None  # "system_default" | "assessor_rubric" | "auto_generated" (auto-derived if not set)
+    )
     assessor_id: str | None = None
     metadata: dict[str, Any] | None = None
 
@@ -95,6 +102,7 @@ class AdminPolicyRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 1. POST /api/v1/internal/process-material
 # ---------------------------------------------------------------------------
+
 
 @router.post("/internal/process-material", response_model=ProcessMaterialResponse)
 async def process_material(req: ProcessMaterialRequest):
@@ -108,7 +116,9 @@ async def process_material(req: ProcessMaterialRequest):
     Uses shared material_processor (C-3 transactional, C-2 fail-fast on embedding, H-5 shared logic).
     """
     if req.source_type == "rubric" and not req.assessment_id:
-        raise HTTPException(400, "assessment_id is required when source_type is 'rubric'")
+        raise HTTPException(
+            400, "assessment_id is required when source_type is 'rubric'"
+        )
 
     try:
         result = await _process_material(
@@ -130,6 +140,7 @@ async def process_material(req: ProcessMaterialRequest):
 # ---------------------------------------------------------------------------
 # 2. POST /api/v1/internal/store-topics
 # ---------------------------------------------------------------------------
+
 
 @router.post("/internal/store-topics")
 async def store_topics(req: StoreTopicsRequest):
@@ -161,6 +172,7 @@ async def store_topics(req: StoreTopicsRequest):
 # 3. POST /api/v1/internal/get-topics
 # ---------------------------------------------------------------------------
 
+
 @router.post("/internal/get-topics")
 async def get_topics(req: GetTopicsRequest):
     """Return topics for a workflow."""
@@ -189,6 +201,7 @@ async def get_topics(req: GetTopicsRequest):
 # 4. POST /api/v1/internal/similarity-search
 # ---------------------------------------------------------------------------
 
+
 @router.post("/internal/similarity-search")
 async def similarity_search(req: SimilaritySearchRequest):
     """Vector similarity search across document/policy/enriched KBs."""
@@ -216,6 +229,7 @@ async def similarity_search(req: SimilaritySearchRequest):
 # 5. POST /api/v1/internal/search-policies
 # ---------------------------------------------------------------------------
 
+
 @router.post("/internal/search-policies")
 async def search_policies(req: SearchPoliciesRequest):
     """Search policy_chunks for rubric/grading criteria."""
@@ -230,6 +244,7 @@ async def search_policies(req: SearchPoliciesRequest):
 # 6. POST /api/v1/internal/chunks-by-workflow
 # ---------------------------------------------------------------------------
 
+
 @router.post("/internal/chunks-by-workflow")
 async def chunks_by_workflow(req: ChunksByWorkflowRequest):
     """Get all document chunks for a workflow."""
@@ -241,6 +256,7 @@ async def chunks_by_workflow(req: ChunksByWorkflowRequest):
 # 7. POST /api/v1/internal/chunks-by-ids
 # ---------------------------------------------------------------------------
 
+
 @router.post("/internal/chunks-by-ids")
 async def chunks_by_ids(req: ChunksByIdsRequest):
     """Get specific chunks by ID."""
@@ -249,11 +265,32 @@ async def chunks_by_ids(req: ChunksByIdsRequest):
 
 
 # ---------------------------------------------------------------------------
+# 7b. GET /api/v1/knowledge/chunks/{chunk_id} — External (Frontend)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/knowledge/chunks/{chunk_id}")
+async def get_chunk_detail(chunk_id: str):
+    """Get a single chunk by ID — for frontend grounding citations.
+
+    Per api_contract.md Section 3.2.5 (External REST).
+    Used in HITL review (Phase 8) and evaluation reports (Phase 12).
+    """
+    chunks = await repo.get_chunks_by_ids([chunk_id])
+    if not chunks:
+        raise HTTPException(404, "Chunk not found")
+    return chunks[0]
+
+
+# ---------------------------------------------------------------------------
 # 8. POST /api/v1/admin/policies
 # ---------------------------------------------------------------------------
 
+
 @router.post("/admin/policies")
-async def admin_add_policy(req: AdminPolicyRequest, user: UserContext = Depends(get_current_user)):
+async def admin_add_policy(
+    req: AdminPolicyRequest, user: UserContext = Depends(get_current_user)
+):
     """Upload policy document — system-wide or per-assessment."""
     chunks = chunking.split_text_into_chunks(req.content)
     if not chunks:

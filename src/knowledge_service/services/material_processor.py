@@ -12,7 +12,6 @@ import structlog
 from knowledge_service.db.pool import get_pool
 from knowledge_service.db import repository as repo
 from knowledge_service.services import chunking, embedding
-from knowledge_service.services.embedding import EmbeddingError
 
 logger = structlog.get_logger(__name__)
 
@@ -54,7 +53,7 @@ async def process_material(
     # Embed in batches — fails fast on error (C-2)
     embeddings: list[list[float]] = []
     for batch_start in range(0, len(chunks), EMBED_BATCH_SIZE):
-        batch = chunks[batch_start:batch_start + EMBED_BATCH_SIZE]
+        batch = chunks[batch_start : batch_start + EMBED_BATCH_SIZE]
         batch_embeddings = await embedding.embed_texts(batch)
         embeddings.extend(batch_embeddings)
 
@@ -72,7 +71,8 @@ async def process_material(
                     # Dedup check
                     dup = await conn.fetchrow(
                         "SELECT 1 FROM document_chunks WHERE workflow_id = $1 AND content_hash = $2 LIMIT 1",
-                        workflow_id, content_hash,
+                        workflow_id,
+                        content_hash,
                     )
                     if dup:
                         continue
@@ -84,10 +84,19 @@ async def process_material(
                              source_file, file_hash, content_hash, assessor_id, token_count, metadata)
                         VALUES ($1, $2, $3::vector, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
                         """,
-                        workflow_id, chunk_text, _vec_literal(emb), i, source_type,
-                        source_file, file_hash, content_hash,
-                        repo._to_uuid(assessor_id), token_count,
-                        repo._jsonb({"source_file": source_file} if source_file else None),
+                        workflow_id,
+                        chunk_text,
+                        _vec_literal(emb),
+                        i,
+                        source_type,
+                        source_file,
+                        file_hash,
+                        content_hash,
+                        repo._to_uuid(assessor_id),
+                        token_count,
+                        repo._jsonb(
+                            {"source_file": source_file} if source_file else None
+                        ),
                     )
 
                 elif source_type == "rubric":
@@ -97,9 +106,15 @@ async def process_material(
                             (content, embedding, policy_type, assessment_id, source, chunk_index, metadata)
                         VALUES ($1, $2::vector, $3, $4, $5, $6, $7::jsonb)
                         """,
-                        chunk_text, _vec_literal(emb), "rubric",
-                        repo._to_uuid(assessment_id), "assessor_rubric", i,
-                        repo._jsonb({"source_file": source_file} if source_file else None),
+                        chunk_text,
+                        _vec_literal(emb),
+                        "rubric",
+                        repo._to_uuid(assessment_id),
+                        "assessor_rubric",
+                        i,
+                        repo._jsonb(
+                            {"source_file": source_file} if source_file else None
+                        ),
                     )
 
                 elif source_type == "web_research":
@@ -109,9 +124,15 @@ async def process_material(
                             (workflow_id, content, embedding, source_url, source_type, assessor_id, metadata)
                         VALUES ($1, $2, $3::vector, $4, $5, $6, $7::jsonb)
                         """,
-                        workflow_id, chunk_text, _vec_literal(emb),
-                        source_url, "web_text", repo._to_uuid(assessor_id),
-                        repo._jsonb({"source_file": source_file} if source_file else None),
+                        workflow_id,
+                        chunk_text,
+                        _vec_literal(emb),
+                        source_url,
+                        "web_text",
+                        repo._to_uuid(assessor_id),
+                        repo._jsonb(
+                            {"source_file": source_file} if source_file else None
+                        ),
                     )
 
                 created += 1

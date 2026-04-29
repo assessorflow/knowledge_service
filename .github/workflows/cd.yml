@@ -1,0 +1,120 @@
+name: CD — Push to Artifact Registry + DAST
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: aflow-491809
+  GCP_REGION: asia-southeast1
+  SERVICE_NAME: knowledge-service
+  IMAGE: asia-southeast1-docker.pkg.dev/aflow-491809/knowledge-service/knowledge-service
+
+jobs:
+  push:
+    name: Build + Push to Artifact Registry
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - id: version
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  dast:
+    name: DAST — ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    needs: [push]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: assessorflow
+          POSTGRES_PASSWORD: assessorflow_prod
+          POSTGRES_DB: af_knowledge
+        ports:
+          - 15434:5432
+        options: >-
+          --health-cmd "pg_isready -U assessorflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Apply DDL
+        run: |
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=assessorflow_prod psql -h localhost -p 15434 -U assessorflow -d af_knowledge -f reference/ddl.sql
+
+      - name: Pull and run container
+        run: |
+          docker pull ${{ env.IMAGE }}:${{ needs.push.outputs.image-tag }}
+          docker run -d --name knowledge-service \
+            --network host \
+            -e KS_DB_HOST=localhost \
+            -e KS_DB_PORT=15434 \
+            -e KS_DB_NAME=af_knowledge \
+            -e KS_DB_USER=assessorflow \
+            -e KS_DB_PASSWORD=assessorflow_prod \
+            ${{ env.IMAGE }}:${{ needs.push.outputs.image-tag }}
+
+      - name: Wait for service
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8030/health; then echo "Ready"; break; fi
+            echo "Waiting... ($i/30)"; sleep 2
+          done
+
+      - uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "http://localhost:8030"
+          cmd_options: "-a -j"
+          allow_issue_writing: false
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: report_html.html
+
+      - if: failure()
+        run: docker logs knowledge-service
